@@ -91,24 +91,27 @@ class Bot:
                     continue
                 print(long_poll_response)
                 for update in long_poll_response['updates']:
-                    if len(update) >= 4:
-                        if update[3] < 2000000000:
-                            message_from_id = update[3]
-                        else:
-                            message_from_id = int(update[6]['from'])
-                    else:
-                        message_from_id = 0
-                    if message_from_id not in self.banlist:
-                        for listener in self.listeners[:]:
-                            if update[0] in listener['triggers']:
-                                print(update)
-                                Thread(target=listener['responder'], args=(self, update)).start()
+                    Thread(target=self.message_processor, args=(update,)).start()
             except Exception:
                 exc_type, exc_value, exc_traceback = sys.exc_info()
                 lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
                 traceback_str = ''.join(line for line in lines)
                 self.log_traceback('Longpoll Listener', traceback_str)
                 print(traceback_str)
+
+    def message_processor(self, update):
+        if len(update) >= 4:
+            if update[3] < 2000000000:
+                message_from_id = update[3]
+            else:
+                message_from_id = int(update[6]['from'])
+        else:
+            message_from_id = 0
+        if message_from_id not in self.banlist:
+            for listener in self.listeners[:]:
+                if update[0] in listener['triggers']:
+                    print(update)
+                    listener['responder'](self, update)
 
     def start_polling(self):
         Thread(target=self.lp_listener).start()
