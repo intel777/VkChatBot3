@@ -65,6 +65,63 @@ class Bot:
         {}
         '''.format(module_name, get_time_date_string(), traceback_data))
 
+    def upload_message_image(self, filename, result_array=None, index=0, upload_server=None):
+        result = False
+        retry_counter = 0
+        while not result:
+            print('[ImageUploader][#{}]Uploading image, try {}'.format(retry_counter, index))
+            try:
+                return_data = {}
+                if not upload_server:
+                    data = self.api.photos.getMessagesUploadServer()
+                else:
+                    print('[ImageUploader][#{}]Detected predetermined upload server'.format(index))
+                    data = upload_server
+                response = requests.post(data['upload_url'], files={'photo': open(filename, 'rb')})
+                if response.status_code == requests.codes.ok:
+                    if result_array:
+                        print('[ImageUploader][#{}]Detected multithread mode'.format(index))
+                        result = True
+                        result_array[index] = {'server': response.json()['server'], 'photo': response.json()['photo'],
+                                               'hash': response.json()['hash']}
+                    else:
+                        params = {'server': response.json()['server'], 'photo': response.json()['photo'],
+                                  'hash': response.json()['hash']}
+                        msgphoto = self.api.photos.saveMessagesPhoto(**params)
+                        photoID = msgphoto[0]['id']
+                        result = True
+                        return_data['user_id'] = data['user_id']
+                        return_data['photo_id'] = photoID
+                        return return_data
+            except Exception:
+                exc_type, exc_value, exc_traceback = sys.exc_info()
+                lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+                traceback_str = ''.join(line for line in lines)
+                print(traceback_str)
+                if retry_counter < 1:
+                    retry_counter += 1
+                else:
+                    return "Error"
+
+    def mass_upload_message_images(self, images):
+        thread_pool = [None] * len(images)
+        save_data_array = [None] * len(images)
+        upload_servers = self.api.execute(
+            code="var result = [];var i = 0;while(i<" + str(len(images)) +
+                 "){var temp = API.photos.getMessagesUploadServer();result.push(temp);i = i + 1;}return result;")
+        for i in range(0, len(images)):
+            thread_pool[i] = Thread(target=self.upload_message_image,
+                                    args=(images[i], save_data_array, i, upload_servers[i]))
+            thread_pool[i].start()
+        for i in range(0, len(images)):
+            thread_pool[i].join()
+        return_array = self.api.execute(
+            code='var images = ''' + json.dumps(save_data_array) + ';var response = [];var i = 0;while(i < '
+                 + str(len(save_data_array))
+                 + '){var temp = API.photos.saveMessagesPhoto(images[i]);response.push(temp[0]);i=i+1;}return response;'
+        )
+        return return_array
+
     def refresh_long_poll(self):
         print('[LongPollProvider]Refreshing longpoll...')
         longpoll_data = self.api.messages.getLongPollServer(lp_version=3)
@@ -110,7 +167,6 @@ class Bot:
         if message_from_id not in self.banlist:
             for listener in self.listeners[:]:
                 if update[0] in listener['triggers']:
-                    print(update)
                     listener['responder'](self, update)
 
     def start_polling(self):
