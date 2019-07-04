@@ -90,3 +90,5 @@ class Handler:
             for image in vk_images:
                 attachments.append('photo{}_{}'.format(image['owner_id'], image['id']))
             bot.tx(peer=message_peer, txt='Ну, как-то так', ats=attachments)
+            for file in images:
+                os.remove(file)
