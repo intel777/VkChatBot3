@@ -1,6 +1,7 @@
 import re
 import wikipedia
 
+
 class Handler:
 
     list_triggers = [4]
