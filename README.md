@@ -1,5 +1,5 @@
 # VkChatBot3
-First public version of VkChatBot, work in progress \n
+First public version of VkChatBot, work in progress <br>
 Примеры модулей лежат в папке modules. loader не удалять, без него не смогут грузится другие модули (да, это модуль который грузит другие модули) 
 
 # Запуск бота
