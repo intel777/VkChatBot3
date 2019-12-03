@@ -4,7 +4,7 @@ print('VkChatBot version 3.0.0 starting...')
 vkToken = 'YOUR_ACCESS_TOKEN_HERE'
 
 modules_to_load = ['loader', 'admin_tools', 'simple_chat', 'intel_ark', 'wallhaven', 'wit_ai', 'wikipedia', 'lurk',
-                   'yandex_tts', 'bugurt', 'rutracker', 'wolframalpha', 'rkn', 'everypixel', 'parliament', 'bssid_locator']
+                   'yandex_tts']
 
 print('[VKCB][Boot]Initializing Bot...')
 bot = Bot()
