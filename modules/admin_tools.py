@@ -11,7 +11,7 @@ def get_numberic_userid(api, userid):
 
 def get_fwd_ment_user_id(bot, update):
     user_id = None
-    if 'fwd_count' in update[6] and int(update[6]['fwd_count']) > 0:
+    if 'fwd' in update[7].keys():
         message = bot.convert_longpoll_message(update[1])
         user_id = message['items'][0]['fwd_messages'][0]['user_id']
     elif 'mentions' in update[6]:
@@ -26,7 +26,7 @@ def get_fwd_ment_user_id(bot, update):
 class Handler:
 
     list_triggers = [4]
-    regexp_patterns = ['!ban*.', '!unban*.', '!addadm*.', '!rmadm*.', '!isbanned*.', '!isadmin*.']
+    regexp_patterns = ['!ban.*', '!unban.*', '!addadm.*', '!rmadm.*', '!isbanned.*', '!isadmin.*']
     regexp_pattern = "(" + ")|(".join(regexp_patterns) + ")"
 
     def responder(self, bot, update):
