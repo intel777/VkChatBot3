@@ -5,7 +5,7 @@ import random
 import re
 from wit import Wit
 
-wit_ai = Wit('')
+wit_ai = Wit('') #
 
 
 def wit_recognize(audiomsg_link):
