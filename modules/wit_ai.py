@@ -5,7 +5,7 @@ import random
 import re
 from wit import Wit
 
-wit_ai = Wit('') # Your Wit.ai token here
+wit_ai = Wit('7INCCU6WWISB3H6PX2GWGE5RBFIAAVKH')
 
 
 def wit_recognize(audiomsg_link):
@@ -20,7 +20,10 @@ def wit_recognize(audiomsg_link):
         audiomsg_file.write(audiomsg.content)
     print('[Wit.AI]Decoding message...')
     with open(filename, 'rb') as audiomsg_file:
-        response = wit_ai.speech(audiomsg_file, None, {'Content-Type': 'audio/mpeg3'})['_text']
+        try:
+            response = wit_ai.speech(audiomsg_file, None, {'Content-Type': 'audio/mpeg3'})['_text']
+        except Exception:
+            response = '[Голосовое сообщение слишком длинное, или сервер не ответил на запрос]'
     os.remove(filename)
     return response
 
@@ -51,7 +54,8 @@ class Handler:
         if re.match(self.regexp_pattern, message_text):
             if re.match(self.regexp_patterns[0], message_text):
                 print('[Wit.AI]Decode of fwd_message requested, processing...')
-                if 'fwd_count' in update[6] and int(update[6]['fwd_count']) > 0:
+                bot.api.messages.setActivity(peer_id=message_peer, type='typing')
+                if 'fwd' in update[7].keys():
                     message = bot.convert_longpoll_message(update[1])
                     for fwd_message in message['items'][0]['fwd_messages']:
                         if ('attachments' in fwd_message) and (
@@ -67,8 +71,8 @@ class Handler:
                         reply = '=====[Речь -> Текст]=====\n'
                         reply += '\n'.join(recognition_results)
                         reply += '\n======================'
-                    else:
-                        reply = 'Не удалось найти аудиосообщения для распознавания.'
+                else:
+                    reply = 'Не удалось найти аудиосообщения для распознавания.'
             elif re.match(self.regexp_patterns[1], message_text):
                 if message_peer in self.auto_recognition_peers:
                     self.auto_recognition_peers.remove(message_peer)
@@ -83,6 +87,7 @@ class Handler:
             if len(update) > 7:
                 if ('attach1_kind' in update[7]) and (update[7]['attach1_kind'] == 'audiomsg'):
                     print('[Wit.AI]Auto recognition triggered, processing...')
+                    bot.api.messages.setActivity(peer_id=message_peer, type='typing')
                     message = bot.convert_longpoll_message(update[1])
                     recognition_results.append(wit_recognize(message['items'][0]['attachments'][0]['doc']['preview']['audio_msg']['link_mp3']))
                     if recognition_results:
