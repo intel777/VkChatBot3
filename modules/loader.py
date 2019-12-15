@@ -6,7 +6,7 @@ class Handler:
 
     list_triggers = [4]
     regexp_patterns = ['Рут, список модулей', 'Рут, загрузи модуль .*', 'Рут, выгрузи модуль .*', '!loader.list',
-                       '!loader.load .*', '!loader.unload .*']
+                       '!loader.load .*', '!loader.unload .*', 'Рут, перезагрузи модуль .*', '!loader.reload .*']
     regexp_pattern = "(" + ")|(".join(regexp_patterns) + ")"
 
     def responder(self, bot, update):
@@ -48,4 +48,14 @@ class Handler:
                             reply = 'Ошибка выгрузки модуля. Проверьте правильность написания имени модуля.'
                     else:
                         reply = 'Модуль {} не загружен, поэтому не может быть выгружен.'.format(module_name)
+                elif re.match(self.regexp_patterns[6], message_text) or re.match(self.regexp_patterns[7], message_text):
+                    module_name = message_text.replace('Рут, перезагрузи модуль ', '').replace('!loader.reload ', '')
+                    if bot.module_loaded(module_name):
+                        reload_result = bot.reload_module(module_name)
+                        if reload_result:
+                            reply = 'Модуль {} успешно перезагружен.'.format(module_name)
+                        else:
+                            reply = 'Ошибка перезагрузки модуля. Проверьте правильность написания имени модуля.'
+                    else:
+                        reply = 'Модуль {} не загружен, поэтому не может быть перезагружен.'.format(module_name)
                 bot.tx(update[3], txt=reply)
