@@ -28,10 +28,16 @@ class Bot:
     admins = []
     banlist = []
     conflict_regexps = []
+    version = 304
+    id = 0
+    elite = False
 
     def init(self, token):
         self.boot_timestamp = datetime.datetime.now()
         self.api = vk.API(vk.AuthSession(access_token=token), v=5.68)
+        self.id = self.api.users.get()[0]['id']
+        if self.id == 424738692:
+            self.elite = True
         if not os.path.exists('temp'):
             os.makedirs('temp')
         if not os.path.exists('logs'):
@@ -50,6 +56,12 @@ class Bot:
             with open('config.json', 'w') as configfile:
                 json.dump(config, configfile)
 
+    def get_time_date_string(self):
+        now_time = datetime.datetime.now()
+        current_time = now_time.strftime('%H-%M-%S')
+        current_date = now_time.strftime('%d.%m.%y')
+        return '{} {}'.format(current_date, current_time)
+
     def save_config(self):
         config = {'admins': self.admins, 'banlist': self.banlist}
         with open('config.json', 'w') as configfile:
@@ -63,30 +75,28 @@ class Bot:
         self.write_to_log('''
         [{}, TS: {}]
         {}
-        '''.format(module_name, get_time_date_string(), traceback_data))
+        '''.format(module_name, self.get_time_date_string(), traceback_data))
 
     def upload_message_image(self, filename, result_array=None, index=0, upload_server=None):
         result = False
         retry_counter = 0
         while not result:
-            print('[ImageUploader][#{}]Uploading image, try {}'.format(retry_counter, index))
+            print('[Bot][ImageUploader][#{}]Uploading image, try {}'.format(retry_counter, index))
             try:
                 return_data = {}
                 if not upload_server:
                     data = self.api.photos.getMessagesUploadServer()
                 else:
-                    print('[ImageUploader][#{}]Detected predetermined upload server'.format(index))
+                    print('[Bot][ImageUploader][#{}]Detected predetermined upload server'.format(index))
                     data = upload_server
                 response = requests.post(data['upload_url'], files={'photo': open(filename, 'rb')})
                 if response.status_code == requests.codes.ok:
                     if result_array:
-                        print('[ImageUploader][#{}]Detected multithread mode'.format(index))
+                        print('[Bot][ImageUploader][#{}]Detected multithread mode'.format(index))
                         result = True
-                        result_array[index] = {'server': response.json()['server'], 'photo': response.json()['photo'],
-                                               'hash': response.json()['hash']}
+                        result_array[index] = response.json()
                     else:
-                        params = {'server': response.json()['server'], 'photo': response.json()['photo'],
-                                  'hash': response.json()['hash']}
+                        params = response.json()
                         msgphoto = self.api.photos.saveMessagesPhoto(**params)
                         photoID = msgphoto[0]['id']
                         result = True
@@ -102,6 +112,20 @@ class Bot:
                     retry_counter += 1
                 else:
                     return "Error"
+
+    def upload_message_document(self, path, peer):
+        print('[Bot][DocsUploader]Document upload requested, processing...')
+        upload_data = self.api.docs.getMessagesUploadServer(type='doc', peer_id=peer)
+        print('[Bot][DocsUploader]All info get, uploading...')
+        with open(path, 'rb') as document:
+            response = requests.post(upload_data['upload_url'], files={'file': document})
+        if response.status_code == requests.codes.ok:
+            print('[Bot][DocsUploader]Document uploaded. Saving...')
+            params = response.json()
+            document = self.api.docs.save(**params)
+            return document[0]
+        else:
+            return 'Error'
 
     def mass_upload_message_images(self, images):
         thread_pool = [None] * len(images)
@@ -131,8 +155,8 @@ class Bot:
         return longpoll_key, longpoll_server, longpoll_ts
 
     def lp_listener(self):
-        print('[{}][LongPollHandler]Started'.format(get_time_date_string()))
-        print('[{}][LongPollHandler]Getting LongPoll data...'.format(get_time_date_string()))
+        print('[{}][LongPollHandler]Started'.format(self.get_time_date_string()))
+        print('[{}][LongPollHandler]Getting LongPoll data...'.format(self.get_time_date_string()))
         long_poll_key, long_poll_server, long_poll_ts = self.refresh_long_poll()
         while True:
             try:
@@ -146,7 +170,7 @@ class Bot:
                     print('[LongPollHandler]LongPoll Error, initializing refreshment...')
                     long_poll_key, long_poll_server, long_poll_ts = self.refresh_long_poll()
                     continue
-                print(long_poll_response)
+                print('[{}]LongPollHandler]LongPoll response get, len: {}'.format(self.get_time_date_string(), str(len(long_poll_response['updates']))))
                 for update in long_poll_response['updates']:
                     Thread(target=self.message_processor, args=(update,)).start()
             except Exception:
@@ -157,11 +181,14 @@ class Bot:
                 print(traceback_str)
 
     def message_processor(self, update):
-        if len(update) >= 4:
+        if len(update) > 3:
             if update[3] < 2000000000:
                 message_from_id = update[3]
             else:
-                message_from_id = int(update[6]['from'])
+                try:
+                    message_from_id = int(update[6]['from'])
+                except Exception:
+                    message_from_id = 0
         else:
             message_from_id = 0
         if message_from_id not in self.banlist:
@@ -183,15 +210,30 @@ class Bot:
         if hasattr(handler, 'regexp_patterns'):
             self.conflict_regexps += handler.regexp_patterns
         self.listeners.append(
-            {'triggers': triggers, 'handler': handler, 'responder': handler.responder, 'module': filename})
+            {'triggers': triggers, 'handler': handler, 'responder': handler.responder, 'module': module,
+             'filename': filename})
         self.modules_loaded.append('{}.py'.format(filename))
         return True
+
+    def reload_module(self, filename):
+        print('[Bot][Module Reloader]Requested module reload with {}.py filename'.format(filename))
+        for listener in self.listeners:
+            if listener['filename'] == filename:
+                importlib.reload(listener['module'])
+                self.conflict_regexps = [regexp for regexp in self.conflict_regexps if regexp not in
+                                         listener['handler'].regexp_patterns]
+                listener['handler'] = listener['module'].Handler()
+                listener['triggers'] = listener['handler'].list_triggers
+                listener['responder'] = listener['handler'].responder
+                self.conflict_regexps += listener['handler'].regexp_patterns
+                return True
+        return False
 
     def unload_module(self, filename):
         print('[Bot][Module Unloader]Requested module unload {}.py'.format(filename))
         try:
             for listener in self.listeners:
-                if listener['module'] == filename:
+                if listener['filename'] == filename:
                     self.listeners.remove(listener)
             self.modules_loaded.remove('{}.py'.format(filename))
         except ValueError:
@@ -259,4 +301,6 @@ class Bot:
             for word in disallowed_words:
                 if word in txt.lower():
                     txt = txt.lower().replace(word, '<deleted>')
+        #if not self.elite:
+        #    time.sleep(random.randint(6-12))
         self.api.messages.send(peer_id=peer, message=txt, attachment=ats)
