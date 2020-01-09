@@ -3,7 +3,7 @@ from vkchatbot import Bot
 print('VkChatBot version 3.0.0 starting...')
 vkToken = 'YOUR_ACCESS_TOKEN_HERE'
 
-modules_to_load = ['loader', 'admin_tools', 'simple_chat', 'intel_ark', 'wallhaven', 'wit_ai', 'wikipedia', 'lurk',
+modules_to_load = ['loader', 'admin_tools', 'intel_ark', 'wallhaven', 'wit_ai', 'wikipedia', 'lurk',
                    'yandex_tts']
 
 print('[VKCB][Boot]Initializing Bot...')
